@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maintenance — GC Support</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2436;
+    --border: #2a3050;
+    --accent: #4f7cff;
+    --accent2: #ff6b6b;
+    --text: #e8eaf0;
+    --text2: #8892aa;
+    --text3: #4a5270;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* HEADER */
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  /* AUTH */
+  .auth-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 56px);
+    padding: 32px;
+  }
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 48px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+  }
+  .auth-icon {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, #4f7cff22, #4f7cff44);
+    border: 1px solid #4f7cff33;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 24px;
+    font-size: 24px;
+  }
+  .auth-title { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+  .auth-sub { font-size: 14px; color: var(--text2); margin-bottom: 32px; }
+  .btn-google {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: #fff;
+    color: #1f1f1f;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.15s;
+  }
+  .btn-google:hover { opacity: 0.9; }
+  .btn-google svg { flex-shrink: 0; }
+
+  /* MAIN LAYOUT */
+  .main { display: none; }
+  .main.visible { display: block; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px; }
+
+  /* PAGE TITLE */
+  .page-title {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+  .page-sub { font-size: 14px; color: var(--text2); margin-bottom: 32px; }
+
+  /* GRID */
+  .grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; }
+
+  /* FORM */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .form-head {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .form-body { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .field input, .field select, .field textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--accent);
+  }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .field select option { background: var(--surface2); }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* TOGGLE */
+  .toggle-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .toggle-info { display: flex; flex-direction: column; gap: 2px; }
+  .toggle-title { font-size: 14px; font-weight: 500; }
+  .toggle-desc { font-size: 12px; color: var(--text2); }
+  .toggle {
+    width: 44px; height: 24px;
+    background: var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    border: none;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: '';
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 3px; left: 3px;
+    transition: left 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .toggle.on::after { left: 23px; }
+
+  /* CALENDARS PREVIEW */
+  .calendars-hint {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-top: 4px;
+  }
+  .cal-badge {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+  }
+  .cal-badge.active { opacity: 1; }
+  .cal-badge.internal { background: #4f7cff15; color: #4f7cff; border: 1px solid #4f7cff30; }
+  .cal-badge.bank { background: #ff6b6b15; color: #ff6b6b; border: 1px solid #ff6b6b30; }
+  .cal-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* SUBMIT */
+  .btn-submit {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.15s, transform 0.1s;
+    font-family: var(--font);
+  }
+  .btn-submit:hover { opacity: 0.9; }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* STATUS */
+  .status {
+    display: none;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+  .status.success { display: flex; align-items: center; gap: 8px; background: #34d39920; color: var(--green); border: 1px solid #34d39930; }
+  .status.error { display: flex; align-items: center; gap: 8px; background: #f8717120; color: var(--red); border: 1px solid #f8717130; }
+  .status.loading { display: flex; align-items: center; gap: 8px; background: #4f7cff20; color: var(--accent); border: 1px solid #4f7cff30; }
+
+  /* SIDEBAR */
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+  .side-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .side-head {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .side-count {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .side-body { padding: 8px 0; }
+
+  /* EVENTS LIST */
+  .event-item {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: default;
+    transition: background 0.1s;
+  }
+  .event-item:last-child { border-bottom: none; }
+  .event-item:hover { background: var(--surface2); }
+  .event-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .event-name { font-size: 13px; font-weight: 500; line-height: 1.4; }
+  .event-tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .event-tag.bank { background: #ff6b6b20; color: var(--red); }
+  .event-tag.internal { background: #4f7cff20; color: var(--accent); }
+  .event-meta { font-size: 11px; color: var(--text3); display: flex; align-items: center; gap: 6px; }
+  .event-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text3); }
+
+  .empty-state {
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--text3);
+    font-size: 13px;
+  }
+
+  /* USER */
+  .user-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .user-chip:hover { border-color: var(--accent); }
+  .user-avatar {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .user-avatar-placeholder {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* SPINNER */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    flex-shrink: 0;
+  }
+
+  /* PRODUCT PILLS */
+  .products-grid {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 4px 0;
+  }
+  .product-pill {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .product-pill:hover, .product-pill.selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #4f7cff15;
+  }
+
+  @media (max-width: 768px) {
+    .grid { grid-template-columns: 1fr; }
+    .container { padding: 16px; }
+    .header { padding: 0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    GC Maintenance
+  </div>
+  <div class="header-right" id="headerRight">
+    <span style="font-size:13px;color:var(--text2)">Загрузка...</span>
+  </div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div class="auth-wrap" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-icon">📅</div>
+    <div class="auth-title">Maintenance Calendar</div>
+    <div class="auth-sub">Войди через Google чтобы добавлять плановые работы и релизы</div>
+    <button class="btn-google" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+      Войти через Google
+    </button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="main" id="mainApp">
+  <div class="container">
+    <div class="page-title">Плановые работы</div>
+    <div class="page-sub">Все релизы и технические работы в одном месте</div>
+
+    <div class="grid">
+      <!-- FORM -->
+      <div class="form-card">
+        <div class="form-head">Добавить событие</div>
+        <div class="form-body">
+
+          <div class="field">
+            <label>Название</label>
+            <input type="text" id="title" placeholder="Релиз FFBDM v2.3 / Миграция БД / Технические работы" />
+          </div>
+
+          <div class="field">
+            <label>Продукт</label>
+            <div class="products-grid" id="productsGrid"></div>
+            <input type="hidden" id="productSelected" />
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Начало</label>
+              <input type="datetime-local" id="startTime" />
+            </div>
+            <div class="field">
+              <label>Конец</label>
+              <input type="datetime-local" id="endTime" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Тип работ</label>
+            <select id="workType">
+              <option value="release">Релиз</option>
+              <option value="migration">Миграция данных</option>
+              <option value="maintenance">Технические работы</option>
+              <option value="infra">Инфраструктура</option>
+              <option value="other">Другое</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Описание (опционально)</label>
+            <textarea id="description" placeholder="Что делается, ожидаемое время недоступности, ответственный..."></textarea>
+          </div>
+
+          <div class="toggle-wrap">
+            <div class="toggle-info">
+              <div class="toggle-title">Затрагивает банк</div>
+              <div class="toggle-desc">Добавить в банковский календарь для NOC</div>
+            </div>
+            <button class="toggle" id="bankToggle" onclick="toggleBank()"></button>
+          </div>
+
+          <div class="calendars-hint">
+            <div class="cal-badge internal active" id="hintInternal">
+              <div class="cal-dot"></div>
+              Внутренний календарь — всегда
+            </div>
+            <div class="cal-badge bank" id="hintBank">
+              <div class="cal-dot"></div>
+              Банковский календарь (NOC)
+            </div>
+          </div>
+
+          <div class="status" id="status"></div>
+
+          <button class="btn-submit" id="submitBtn" onclick="submitEvent()">Добавить в календарь</button>
+        </div>
+      </div>
+
+      <!-- SIDEBAR -->
+      <div class="sidebar">
+        <div class="side-card">
+          <div class="side-head">
+            Ближайшие события
+            <span class="side-count" id="eventsCount">0</span>
+          </div>
+          <div class="side-body" id="eventsList">
+            <div class="empty-state">Загрузка...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Google API -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const CLIENT_ID = '264055259850-p86g7q67i8klt4p9mtbciug405ak0he3.apps.googleusercontent.com'; // Вставь Google OAuth Client ID
+const CAL_INTERNAL = 'c_882f3f8effd187ba0cc4929f13c8c55986eba3ba7e51ce223113b57b1bef25c3@group.calendar.google.com';
+const CAL_BANK     = 'c_4fc52cbf4dac1d8de39d63eaa56603f245ae74d717f478f1a36f48fce549228d@group.calendar.google.com';
+
+const PRODUCTS = [
+  'FFBDM', 'CFF', 'AC', 'FLLCM', 'FFC', 'FFCT',
+  'COLBANKM', 'FBS', 'FFIL', 'LLPC', 'UINT', 'Loggy', 'Freedom Lenta', 'Инфраструктура'
+];
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let accessToken = null;
+let bankEnabled = false;
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  buildProducts();
+  setDefaultTimes();
+
+  // Restore token from session
+  const saved = sessionStorage.getItem('gc_token');
+  if (saved) {
+    accessToken = saved;
+    showApp();
+    loadEvents();
+  } else {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('headerRight').innerHTML = '';
+  }
+};
+
+function buildProducts() {
+  const grid = document.getElementById('productsGrid');
+  PRODUCTS.forEach(p => {
+    const pill = document.createElement('div');
+    pill.className = 'product-pill';
+    pill.textContent = p;
+    pill.onclick = () => selectProduct(pill, p);
+    grid.appendChild(pill);
+  });
+}
+
+function selectProduct(el, name) {
+  document.querySelectorAll('.product-pill').forEach(p => p.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('productSelected').value = name;
+}
+
+function setDefaultTimes() {
+  const now = new Date();
+  now.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0);
+  const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  document.getElementById('startTime').value = toLocal(now);
+  document.getElementById('endTime').value = toLocal(end);
+}
+
+function toLocal(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+function signIn() {
+  if (!CLIENT_ID) {
+    showStatus('error', 'Вставь Google OAuth Client ID в код (строка CLIENT_ID)');
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/calendar.events',
+    callback: (resp) => {
+      if (resp.error) { showStatus('error', 'Ошибка авторизации: ' + resp.error); return; }
+      accessToken = resp.access_token;
+      sessionStorage.setItem('gc_token', accessToken);
+      showApp();
+      loadEvents();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function signOut() {
+  sessionStorage.removeItem('gc_token');
+  accessToken = null;
+  document.getElementById('mainApp').classList.remove('visible');
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('headerRight').innerHTML = '';
+}
+
+function showApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('mainApp').classList.add('visible');
+  document.getElementById('headerRight').innerHTML = `
+    <div class="user-chip" onclick="signOut()">
+      <div class="user-avatar-placeholder">G</div>
+      Выйти
+    </div>
+  `;
+}
+
+// ── TOGGLE ───────────────────────────────────────────────────────────────────
+function toggleBank() {
+  bankEnabled = !bankEnabled;
+  const btn = document.getElementById('bankToggle');
+  btn.classList.toggle('on', bankEnabled);
+  document.getElementById('hintBank').classList.toggle('active', bankEnabled);
+}
+
+// ── SUBMIT ───────────────────────────────────────────────────────────────────
+async function submitEvent() {
+  const title   = document.getElementById('title').value.trim();
+  const product = document.getElementById('productSelected').value;
+  const start   = document.getElementById('startTime').value;
+  const end     = document.getElementById('endTime').value;
+  const type    = document.getElementById('workType').value;
+  const desc    = document.getElementById('description').value.trim();
+
+  if (!title) { showStatus('error', 'Введи название'); return; }
+  if (!start || !end) { showStatus('error', 'Укажи дату и время'); return; }
+  if (new Date(end) <= new Date(start)) { showStatus('error', 'Конец должен быть позже начала'); return; }
+
+  const typeLabels = { release: 'Релиз', migration: 'Миграция', maintenance: 'Техработы', infra: 'Инфраструктура', other: 'Другое' };
+  const fullTitle = product ? `[${product}] ${title}` : title;
+  const fullDesc  = [
+    `Тип: ${typeLabels[type]}`,
+    product ? `Продукт: ${product}` : '',
+    bankEnabled ? 'Затрагивает банк: Да' : 'Затрагивает банк: Нет',
+    desc ? `\n${desc}` : ''
+  ].filter(Boolean).join('\n');
+
+  const event = {
+    summary: fullTitle,
+    description: fullDesc,
+    start: { dateTime: new Date(start).toISOString(), timeZone: 'Asia/Almaty' },
+    end:   { dateTime: new Date(end).toISOString(),   timeZone: 'Asia/Almaty' },
+    colorId: bankEnabled ? '11' : '1',
+  };
+
+  document.getElementById('submitBtn').disabled = true;
+  showStatus('loading', 'Добавляю в календарь...');
+
+  try {
+    await createEvent(CAL_INTERNAL, event);
+    if (bankEnabled) await createEvent(CAL_BANK, event);
+
+    showStatus('success', bankEnabled
+      ? '✓ Добавлено в оба календаря — внутренний и банковский'
+      : '✓ Добавлено во внутренний календарь');
+
+    // Reset
+    document.getElementById('title').value = '';
+    document.getElementById('description').value = '';
+    document.querySelectorAll('.product-pill').forEach(p => p.classList.remove('selected'));
+    document.getElementById('productSelected').value = '';
+    setDefaultTimes();
+    if (bankEnabled) toggleBank();
+
+    loadEvents();
+  } catch (e) {
+    showStatus('error', 'Ошибка: ' + (e.message || 'проверь права доступа к календарю'));
+  } finally {
+    document.getElementById('submitBtn').disabled = false;
+  }
+}
+
+async function createEvent(calId, event) {
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(event)
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || res.statusText);
+  }
+  return res.json();
+}
+
+// ── LOAD EVENTS ──────────────────────────────────────────────────────────────
+async function loadEvents() {
+  const list = document.getElementById('eventsList');
+  list.innerHTML = '<div class="empty-state">Загружаю...</div>';
+  try {
+    const now = new Date().toISOString();
+    const max = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [intRes, bankRes] = await Promise.all([
+      fetchEvents(CAL_INTERNAL, now, max),
+      fetchEvents(CAL_BANK, now, max)
+    ]);
+
+    const bankIds = new Set((bankRes.items || []).map(e => e.id));
+    const all = (intRes.items || []).map(e => ({ ...e, isBank: bankIds.has(e.id) }));
+    all.sort((a, b) => new Date(a.start.dateTime) - new Date(b.start.dateTime));
+
+    document.getElementById('eventsCount').textContent = all.length;
+
+    if (!all.length) {
+      list.innerHTML = '<div class="empty-state">Нет предстоящих событий</div>';
+      return;
+    }
+
+    list.innerHTML = all.map(e => {
+      const start = new Date(e.start.dateTime || e.start.date);
+      const end   = new Date(e.end.dateTime   || e.end.date);
+      const dateStr = start.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+      const timeStr = `${pad(start.getHours())}:${pad(start.getMinutes())} – ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+      const tag = e.isBank
+        ? '<span class="event-tag bank">Банк</span>'
+        : '<span class="event-tag internal">Внутренний</span>';
+      return `
+        <div class="event-item">
+          <div class="event-top">
+            <div class="event-name">${e.summary || 'Без названия'}</div>
+            ${tag}
+          </div>
+          <div class="event-meta">
+            <span>${dateStr}</span>
+            <span class="event-dot"></span>
+            <span>${timeStr}</span>
+          </div>
+        </div>`;
+    }).join('');
+  } catch {
+    list.innerHTML = '<div class="empty-state">Не удалось загрузить события</div>';
+  }
+}
+
+async function fetchEvents(calId, timeMin, timeMax) {
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=20`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) return { items: [] };
+  return res.json();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function showStatus(type, msg) {
+  const el = document.getElementById('status');
+  el.className = `status ${type}`;
+  el.innerHTML = type === 'loading'
+    ? `<div class="spinner"></div>${msg}`
+    : msg;
+  if (type === 'success') setTimeout(() => { el.className = 'status'; }, 4000);
+}
+</script>
+</body>
+</html>
