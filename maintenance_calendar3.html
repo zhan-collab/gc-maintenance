@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maintenance — GC Support</title>
+<style>
+:root[data-theme="dark"]{--bg:#0d0f18;--surface:#141720;--s2:#1a1e2e;--s3:#20253a;--border:#252b42;--text:#e2e5f0;--t2:#7b849e;--t3:#3d4460;--accent:#5b7fff;--red:#ff6b6b;--green:#3dd68c;--amber:#ffc247;--purple:#a78bfa;--cyan:#38bdf8}
+:root[data-theme="light"]{--bg:#f0f2f8;--surface:#fff;--s2:#f5f6fb;--s3:#eaecf5;--border:#dde1f0;--text:#1a1f36;--t2:#6b7499;--t3:#b0b8d4;--accent:#3b6ef5;--red:#e03e3e;--green:#1a9e5c;--amber:#d4900a;--purple:#6d3fc5;--cyan:#0284c7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;min-height:100vh;font-size:14px}
+.hdr{background:var(--surface);border-bottom:1px solid var(--border);height:52px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
+.logo-icon{width:28px;height:28px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.ibtn{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;color:var(--t2);transition:all .15s;font-family:inherit}
+.ibtn:hover{border-color:var(--accent);color:var(--text)}
+.ubtn{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;color:var(--t2);cursor:pointer;transition:all .15s}
+.ubtn:hover{border-color:var(--red);color:var(--red)}
+
+/* ONBOARDING */
+.onboard{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(4px)}
+.onboard-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;max-width:560px;width:100%;overflow:hidden}
+.onboard-hero{background:linear-gradient(135deg,#1a2550,#0d1530);padding:32px;text-align:center}
+.onboard-emoji{font-size:48px;margin-bottom:12px}
+.onboard-title{font-size:22px;font-weight:700;margin-bottom:8px}
+.onboard-sub{font-size:13px;color:var(--t2);line-height:1.6}
+.onboard-steps{padding:24px;display:flex;flex-direction:column;gap:12px}
+.ostep{display:flex;align-items:flex-start;gap:12px;padding:12px;background:var(--s2);border-radius:10px}
+.ostep-num{width:28px;height:28px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.ostep-info h4{font-size:13px;font-weight:600;margin-bottom:2px}
+.ostep-info p{font-size:12px;color:var(--t2);line-height:1.5}
+.onboard-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
+.obtn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+
+/* AUTH */
+.auth-page{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 52px);padding:24px}
+.auth-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:48px 40px;max-width:400px;width:100%;text-align:center}
+.auth-box h1{font-size:24px;font-weight:700;margin:16px 0 8px}
+.auth-box p{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:32px}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.15);transition:opacity .15s}
+.gbtn:hover{opacity:.9}
+
+/* LAYOUT */
+.app{display:none}
+.app.on{display:flex;height:calc(100vh - 52px)}
+.lpanel{width:360px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden}
+.rpanel{flex:1;overflow-y:auto;padding:24px}
+
+/* BANNER */
+.banner{background:linear-gradient(135deg,color-mix(in srgb,var(--amber) 15%,transparent),color-mix(in srgb,var(--red) 10%,transparent));border-bottom:1px solid color-mix(in srgb,var(--amber) 30%,transparent);padding:9px 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--amber);flex-shrink:0}
+.banner.hidden{display:none}
+
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{flex:1;padding:11px;text-align:center;font-size:11px;font-weight:700;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.tpanel{display:none;flex:1;flex-direction:column;overflow:hidden}
+.tpanel.on{display:flex}
+
+/* SEARCH + FILTERS */
+.search-wrap{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.search-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s}
+.search-input:focus{border-color:var(--accent)}
+.filters{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.fbtn{padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--t2);cursor:pointer;transition:all .15s;font-family:inherit}
+.fbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.sort-wrap{padding:6px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0}
+.sort-label{font-size:10px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.sort-btn{padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--t2);cursor:pointer;font-family:inherit;transition:all .15s}
+.sort-btn.on{background:var(--s3);color:var(--text);border-color:var(--t2)}
+
+/* EVENTS */
+.elist{flex:1;overflow-y:auto}
+.ev{padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.ev:hover,.ev.exp{background:var(--s2)}
+.ev-top{display:flex;align-items:flex-start;gap:8px}
+.ev-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.ev-inf{flex:1;min-width:0}
+.ev-name{font-size:12px;font-weight:600;line-height:1.4;margin-bottom:2px}
+.ev-meta{font-size:11px;color:var(--t2)}
+.ev-tags{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}
+.tag.bank{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
+.tag.int{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.tag.down{background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--amber)}
+.ev-body{padding:8px 0 4px}
+.ev-desc{font-size:11px;color:var(--t2);line-height:1.6;white-space:pre-wrap;background:var(--s3);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-family:monospace;max-height:200px;overflow-y:auto}
+.ev-acts{display:flex;gap:5px;flex-wrap:wrap}
+.eabtn{flex:1;min-width:80px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--t2);cursor:pointer;transition:all .15s;font-family:inherit}
+.eabtn:hover{border-color:var(--accent);color:var(--accent)}
+.eabtn.danger:hover{border-color:var(--red);color:var(--red)}
+.eabtn.copy:hover{border-color:var(--green);color:var(--green)}
+.empty{padding:32px 14px;text-align:center;color:var(--t3);font-size:13px}
+
+/* CALENDAR EMBED */
+.cal-embed{flex:1}
+.cal-embed iframe{width:100%;height:100%;border:none;min-height:400px}
+
+/* HOW TO */
+.howto{flex:1;overflow-y:auto;padding:16px}
+.howto-section{margin-bottom:20px}
+.howto-section h3{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.howto-item{display:flex;gap:10px;padding:10px;background:var(--s2);border-radius:8px;margin-bottom:6px}
+.howto-icon{font-size:18px;flex-shrink:0}
+.howto-text h4{font-size:12px;font-weight:600;margin-bottom:2px}
+.howto-text p{font-size:11px;color:var(--t2);line-height:1.5}
+.howto-example{background:var(--s3);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--t2);font-family:monospace;margin-top:6px;line-height:1.6}
+
+/* FORM */
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:4px}
+.field-hint{font-size:11px;color:var(--t3);margin-top:2px}
+.field input,.field select,.field textarea{background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.field input.err,.field select.err{border-color:var(--red)}
+.field textarea{resize:vertical;min-height:130px;font-family:'Courier New',monospace;font-size:11px;line-height:1.7}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* PILLS */
+.pgroup{margin-bottom:10px}
+.pgroup-label{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.ppills{display:flex;flex-wrap:wrap;gap:5px}
+.pill{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;border:1px solid var(--border);background:var(--s3);color:var(--t2);cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:4px}
+.pill:hover{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.pill.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent);font-weight:700}
+.pill.int:hover,.pill.int.on{border-color:var(--purple);color:var(--purple);background:color-mix(in srgb,var(--purple) 12%,transparent)}
+.pill.inf:hover,.pill.inf.on{border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+.pill-sub{font-size:9px;color:var(--t3);font-weight:400}
+.pill.on .pill-sub{color:inherit;opacity:.7}
+
+/* TOGGLE */
+.togrow{display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.toglabel .t1{font-size:13px;font-weight:500}
+.toglabel .t2{font-size:11px;color:var(--t2);margin-top:2px}
+.tog{width:38px;height:21px;background:var(--border);border-radius:11px;cursor:pointer;position:relative;transition:background .2s;border:none;flex-shrink:0}
+.tog.on{background:var(--accent)}
+.tog::after{content:'';width:15px;height:15px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.tog.on::after{left:20px}
+.cbadges{display:flex;gap:6px}
+.cbadge{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;opacity:.3;transition:opacity .2s}
+.cbadge.on{opacity:1}
+.cbadge.i{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 25%,transparent)}
+.cbadge.b{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 25%,transparent)}
+.bdot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* SLACK */
+.slack-section{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px}
+.slack-title{font-size:12px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:14px 18px;border-radius:12px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.3);transform:translateY(80px);opacity:0;transition:all .25s;pointer-events:none;max-width:340px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:var(--green);color:#fff}
+.toast.error{background:var(--red);color:#fff}
+.toast.loading{background:var(--surface);border:1px solid var(--border);color:var(--text)}
+
+.fcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.fcard-head{padding:14px 18px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.08em}
+.fcard-body{padding:18px;display:flex;flex-direction:column;gap:14px}
+.pbtn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;width:100%;transition:opacity .15s;font-family:inherit}
+.pbtn:hover{opacity:.9}
+.pbtn:disabled{opacity:.4;cursor:not-allowed}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--t2);margin-bottom:20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div class="onboard" id="onboard" style="display:none">
+  <div class="onboard-box">
+    <div class="onboard-hero">
+      <div class="onboard-emoji">📅</div>
+      <div class="onboard-title">GC Maintenance Calendar</div>
+      <div class="onboard-sub">Сервис для анонса плановых работ — релизов, миграций и техработ. Заполни форму, и все нужные команды узнают о работах заранее.</div>
+    </div>
+    <div class="onboard-steps">
+      <div class="ostep">
+        <div class="ostep-num">1</div>
+        <div class="ostep-info">
+          <h4>Выбери тип работ и продукт</h4>
+          <p>Релиз, хотфикс, миграция БД или техработы. Выбери продукт из списка — название заполнится автоматически.</p>
+        </div>
+      </div>
+      <div class="ostep">
+        <div class="ostep-num">2</div>
+        <div class="ostep-info">
+          <h4>Укажи время и заполни описание</h4>
+          <p>Шаблон описания подставится автоматически. Заполни поля: команда, эффект на прод, ответственный.</p>
+        </div>
+      </div>
+      <div class="ostep">
+        <div class="ostep-num">3</div>
+        <div class="ostep-info">
+          <h4>Отметь затрагивает ли Freedom Bank</h4>
+          <p>Если работы могут повлиять на сервисы банка — включи тоггл. Событие попадёт в отдельный календарь NOC банка.</p>
+        </div>
+      </div>
+      <div class="ostep">
+        <div class="ostep-num">4</div>
+        <div class="ostep-info">
+          <h4>Нажми "Добавить в календарь"</h4>
+          <p>Событие появится в общем календаре. Если настроен Slack — бот напишет анонс в канал автоматически.</p>
+        </div>
+      </div>
+    </div>
+    <div class="onboard-footer">
+      <button class="obtn" onclick="closeOnboard()">Понятно, начнём →</button>
+    </div>
+  </div>
+</div>
+
+<div class="hdr">
+  <div class="logo"><div class="logo-icon">📅</div>GC Maintenance</div>
+  <div class="hdr-right">
+    <button class="ibtn" onclick="toggleTheme()" id="themeBtn">☀️</button>
+    <button class="ibtn" onclick="showOnboard()">❓ Как пользоваться</button>
+    <div id="userArea"></div>
+  </div>
+</div>
+
+<!-- AUTH -->
+<div class="auth-page" id="authPage">
+  <div class="auth-box">
+    <div style="font-size:48px">🚀</div>
+    <h1>Плановые работы</h1>
+    <p>Все релизы, миграции и техработы в одном месте. Войди через корпоративный аккаунт @globerce.capital</p>
+    <button class="gbtn" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+      Войти через Google
+    </button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="lpanel">
+    <div id="banner" class="banner hidden">⚠️ <span id="bannerText"></span></div>
+    <div class="tabs">
+      <div class="tab on" onclick="switchTab('events',this)">События</div>
+      <div class="tab" onclick="switchTab('calendar',this)">Календарь</div>
+      <div class="tab" onclick="switchTab('howto',this)">Помощь</div>
+    </div>
+
+    <!-- EVENTS -->
+    <div class="tpanel on" id="tab-events">
+      <div class="search-wrap">
+        <input class="search-input" id="searchInput" placeholder="🔍 Поиск по названию или описанию..." oninput="renderEvents()" />
+      </div>
+      <div class="filters">
+        <button class="fbtn on" onclick="setFilter('all',this)">Все</button>
+        <button class="fbtn" onclick="setFilter('bank',this)">🏦 Freedom Bank</button>
+        <button class="fbtn" onclick="setFilter('int',this)">🔒 Внутренние</button>
+        <button class="fbtn" onclick="setFilter('down',this)">⚠️ Даунтайм</button>
+      </div>
+      <div class="sort-wrap">
+        <span class="sort-label">Сортировка:</span>
+        <button class="sort-btn on" onclick="setSort('date',this)">По дате</button>
+        <button class="sort-btn" onclick="setSort('product',this)">По продукту</button>
+      </div>
+      <div class="elist" id="elist"><div class="empty">Загрузка...</div></div>
+    </div>
+
+    <!-- CALENDAR -->
+    <div class="tpanel" id="tab-calendar">
+      <div class="cal-embed">
+        <iframe src="https://calendar.google.com/calendar/embed?src=c_4fc52cbf4dac1d8de39d63eaa56603f245ae74d717f478f1a36f48fce549228d%40group.calendar.google.com&ctz=Asia%2FAlmaty&showTitle=0&showNav=1&showPrint=0&showTabs=0&showCalendars=0&mode=AGENDA&hl=ru" frameborder="0" scrolling="no"></iframe>
+      </div>
+    </div>
+
+    <!-- HOW TO -->
+    <div class="tpanel" id="tab-howto">
+      <div class="howto">
+        <div class="howto-section">
+          <h3>📋 Когда добавлять событие?</h3>
+          <div class="howto-item">
+            <div class="howto-icon">🚀</div>
+            <div class="howto-text"><h4>Релиз</h4><p>Выкатываешь новую версию сервиса в прод</p></div>
+          </div>
+          <div class="howto-item">
+            <div class="howto-icon">🔥</div>
+            <div class="howto-text"><h4>Хотфикс</h4><p>Срочный фикс критической проблемы на проде</p></div>
+          </div>
+          <div class="howto-item">
+            <div class="howto-icon">🗃️</div>
+            <div class="howto-text"><h4>Миграция БД</h4><p>Изменения в структуре базы данных</p></div>
+          </div>
+          <div class="howto-item">
+            <div class="howto-icon">🔧</div>
+            <div class="howto-text"><h4>Техработы</h4><p>Обслуживание серверов, обновление зависимостей, чистка</p></div>
+          </div>
+          <div class="howto-item">
+            <div class="howto-icon">⚙️</div>
+            <div class="howto-text"><h4>Инфраструктура</h4><p>Работы на уровне K8s, PostgreSQL, S3, сети</p></div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <h3>🏦 Затрагивает Freedom Bank — когда включать?</h3>
+          <div class="howto-item">
+            <div class="howto-icon">✅</div>
+            <div class="howto-text">
+              <h4>Включай если</h4>
+              <p>Работы могут повлиять на сервисы банка: ипотека, авто, потребкредит, collection и другие продукты в списке Freedom Bank</p>
+            </div>
+          </div>
+          <div class="howto-item">
+            <div class="howto-icon">❌</div>
+            <div class="howto-text">
+              <h4>Не включай если</h4>
+              <p>Это только внутренние сервисы: Loggy, Brokerage, NIET — или инфраструктурные работы без влияния на банк</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <h3>⚠️ Даунтайм — что это?</h3>
+          <div class="howto-item">
+            <div class="howto-icon">⏱️</div>
+            <div class="howto-text">
+              <h4>Сервис будет недоступен</h4>
+              <p>Если во время работ пользователи не смогут пользоваться сервисом — включи даунтайм и укажи сколько минут примерно</p>
+              <div class="howto-example">Пример: релиз с рестартом подов → даунтайм 2-3 мин</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <h3>💬 Slack уведомления</h3>
+          <div class="howto-item">
+            <div class="howto-icon">🤖</div>
+            <div class="howto-text">
+              <h4>Автоматический анонс</h4>
+              <p>Если вставить Webhook URL — бот напишет в Slack канал при добавлении события. Webhook URL спроси у администратора Slack.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <h3>❓ Проблемы?</h3>
+          <div class="howto-item">
+            <div class="howto-icon">💬</div>
+            <div class="howto-text">
+              <h4>Пиши в поддержку</h4>
+              <p>Напиши Жану Ержанулы или в канал #incidents</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="rpanel">
+    <div class="page-title">Добавить событие</div>
+    <div class="page-sub">Заполни форму — событие появится в нужных календарях автоматически</div>
+
+    <div class="fcard">
+      <div class="fcard-head">Детали события</div>
+      <div class="fcard-body">
+
+        <div class="frow">
+          <div class="field">
+            <label>Тип работ</label>
+            <select id="workType" onchange="onTypeChange()">
+              <option value="release">🚀 Релиз</option>
+              <option value="hotfix">🔥 Хотфикс</option>
+              <option value="migration">🗃️ Миграция БД</option>
+              <option value="maintenance">🔧 Техработы</option>
+              <option value="infra">⚙️ Инфраструктура</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Продукт / система</label>
+            <input id="prodDisplay" placeholder="Выбери ниже ↓" readonly style="cursor:default" />
+            <input type="hidden" id="prodVal" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Название события</label>
+          <input type="text" id="title" placeholder="Автозаполнится при выборе продукта" oninput="clearErr(this)" />
+          <div class="field-hint">Кратко: что делается и в каком продукте</div>
+        </div>
+
+        <div>
+          <div class="pgroup">
+            <div class="pgroup-label">Конвейеры Freedom Bank</div>
+            <div class="ppills" id="pgBank"></div>
+          </div>
+          <div class="pgroup">
+            <div class="pgroup-label">Внутренние инструменты</div>
+            <div class="ppills" id="pgInt"></div>
+          </div>
+          <div class="pgroup">
+            <div class="pgroup-label">Другие банки</div>
+            <div class="ppills" id="pgOther"></div>
+          </div>
+          <div class="pgroup">
+            <div class="pgroup-label">Инфраструктура</div>
+            <div class="ppills" id="pgInf"></div>
+          </div>
+        </div>
+
+        <div class="frow">
+          <div class="field">
+            <label>Начало работ</label>
+            <input type="datetime-local" id="startTime" oninput="clearErr(this)" />
+          </div>
+          <div class="field">
+            <label>Конец работ</label>
+            <input type="datetime-local" id="endTime" oninput="clearErr(this)" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Описание</label>
+          <textarea id="description"></textarea>
+          <div class="field-hint">Заполни шаблон — команда, ответственный, эффект на прод</div>
+        </div>
+
+        <div class="togrow">
+          <div class="toglabel">
+            <div class="t1">⚠️ Ожидается даунтайм</div>
+            <div class="t2">Сервис будет временно недоступен во время работ</div>
+          </div>
+          <button class="tog" id="downtimeTog" onclick="toggleDowntime()"></button>
+        </div>
+        <div id="downtimeField" style="display:none">
+          <div class="field">
+            <label>Длительность даунтайма (минут)</label>
+            <input type="number" id="downtimeMin" placeholder="Например: 15" min="1" />
+            <div class="field-hint">Укажи примерное время — даже если не уверен</div>
+          </div>
+        </div>
+
+        <div class="togrow">
+          <div class="toglabel">
+            <div class="t1">🏦 Затрагивает Freedom Bank</div>
+            <div class="t2">Работы могут повлиять на сервисы банка — добавить в календарь NOC</div>
+          </div>
+          <button class="tog" id="bankTog" onclick="toggleBank()"></button>
+        </div>
+
+        <div class="cbadges">
+          <div class="cbadge i on"><div class="bdot"></div>Внутренний календарь</div>
+          <div class="cbadge b" id="badgeBank"><div class="bdot"></div>Календарь Freedom Bank</div>
+        </div>
+
+        <div class="slack-section">
+          <div class="slack-title">💬 Slack уведомление <span style="font-size:10px;color:var(--t3);font-weight:400">(опционально)</span></div>
+          <div class="field" style="margin-bottom:0">
+            <input type="text" id="slackWebhook" placeholder="https://hooks.slack.com/services/..." />
+            <div class="field-hint">Вставь Webhook URL — бот напишет анонс в канал при добавлении</div>
+          </div>
+        </div>
+
+        <button class="pbtn" id="submitBtn" onclick="submitEvent()">Добавить в календарь →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const CLIENT_ID    = '264055259850-p86g7q67i8klt4p9mtbciug405ak0he3.apps.googleusercontent.com';
+const CAL_BANK     = 'c_4fc52cbf4dac1d8de39d63eaa56603f245ae74d717f478f1a36f48fce549228d@group.calendar.google.com';
+const CAL_INTERNAL = 'c_882f3f8effd187ba0cc4929f13c8c55986eba3ba7e51ce223113b57b1bef25c3@group.calendar.google.com';
+
+const BANK_P=[{id:'FFBDM',name:'FFBDM',desc:'Ипотека'},{id:'CFF',name:'CFF',desc:'Универсальные кабинеты'},{id:'AC',name:'AC',desc:'Авто'},{id:'FLLCM',name:'FLLCM',desc:'Кредит ИП'},{id:'FFC',name:'FFC',desc:'МФО Freedom Finance'},{id:'FFCT',name:'FFCT',desc:'Потребкредит'},{id:'COLBANKM',name:'COLBANKM',desc:'Collection'},{id:'FBS',name:'FBS',desc:'Freedom Business'},{id:'FFIL',name:'FFIL',desc:'Кредит под залог'},{id:'LLPC',name:'LLPC',desc:'Кредит ТОО'},{id:'UINT',name:'UINT',desc:'Unified Integrations'},{id:'Lenta',name:'Lenta',desc:'Freedom Lenta'}];
+const INT_P=[{id:'Loggy',name:'Loggy',desc:'Переотправка OTP'},{id:'Brokerage',name:'Brokerage',desc:'Брокерская платформа'},{id:'NIET',name:'NIET',desc:'NIET'}];
+const OTHER_P=[{id:"SkyBank",name:"Sky Bank",desc:"Украина — ипотека и авто"},{id:"OptimaBank",name:"Optima Bank",desc:"Кыргызстан"}];
+const INF_P=[{id:'PostgreSQL',name:'PostgreSQL',desc:'БД / Patroni'},{id:'Kubernetes',name:'K8s',desc:'Кластер ffin-prod'},{id:'S3',name:'S3/VAST',desc:'Хранилище'},{id:'HAProxy',name:'HAProxy',desc:'Балансировщик'},{id:'Network',name:'Сеть',desc:'Сетевая инфра'},{id:'Other',name:'Другое',desc:''}];
+const TYPE_LABELS={release:'Релиз',hotfix:'Хотфикс',migration:'Миграция БД',maintenance:'Техработы',infra:'Инфраструктура'};
+const TYPE_COLORS={release:'#5b7fff',hotfix:'#ff6b6b',migration:'#a78bfa',maintenance:'#ffc247',infra:'#38bdf8'};
+const TMPL={
+  release:`Сервис / продукт: \nКоманда: \nТип: Релиз\nЭффект на прод: без даунтайма / частичный / полный\nДлительность недоступности: \nЗатронутые URL / мониторы: \nОтветственный: \nОткатываемость: есть rollback / нет`,
+  hotfix:`Сервис / продукт: \nКоманда: \nТип: Хотфикс\nПроблема: \nЭффект на прод: без даунтайма / частичный / полный\nДлительность недоступности: \nОтветственный: \nОткатываемость: есть rollback / нет`,
+  migration:`Сервис / продукт: \nКоманда: \nТип: Миграция БД\nЗатронутые таблицы / БД: \nЭффект: без даунтайма / частичный / полный\nДлительность недоступности: \nОтветственный: \nОткатываемость: есть rollback / нет`,
+  maintenance:`Сервис / продукт: \nКоманда: \nТип: Технические работы\nЧто делается: \nЭффект: без даунтайма / частичный / полный\nДлительность недоступности: \nОтветственный: `,
+  infra:`Компонент: \nКоманда: \nТип: Инфраструктура\nЧто делается: \nЭффект: без даунтайма / частичный / полный\nЗатронутые сервисы: \nДлительность: \nОтветственный: `,
+};
+
+let token=null,bankOn=false,downtimeOn=false,filter='all',sort='date',allEvents=[],expandedId=null;
+
+window.onload=()=>{
+  buildPills('pgBank',BANK_P,'');buildPills('pgInt',INT_P,'int');buildPills('pgOther',OTHER_P,'int');buildPills('pgInf',INF_P,'inf');
+  setDefaultTimes();fillTemplate();
+  const th=localStorage.getItem('gc_theme')||'dark';
+  document.documentElement.setAttribute('data-theme',th);
+  document.getElementById('themeBtn').textContent=th==='dark'?'☀️':'🌙';
+  const slackUrl=localStorage.getItem('gc_slack');
+  if(slackUrl)document.getElementById('slackWebhook').value=slackUrl;
+  const saved=localStorage.getItem('gc_tok');
+  if(saved){token=saved;showApp();loadEvents();}
+  if(!localStorage.getItem('gc_onboard_done'))setTimeout(showOnboard,400);
+};
+
+function showOnboard(){document.getElementById('onboard').style.display='flex';}
+function closeOnboard(){document.getElementById('onboard').style.display='none';localStorage.setItem('gc_onboard_done','1');}
+
+function buildPills(id,list,cls){
+  const el=document.getElementById(id);
+  list.forEach(p=>{
+    const d=document.createElement('div');
+    d.className='pill'+(cls?' '+cls:'');
+    d.innerHTML=`<span>${p.name}</span>${p.desc?`<span class="pill-sub">${p.desc}</span>`:''}`;
+    d.onclick=()=>selectPill(d,p.name,p.desc);
+    el.appendChild(d);
+  });
+}
+
+function selectPill(el,name,desc){
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('prodVal').value=name;
+  document.getElementById('prodDisplay').value=desc?`${name} — ${desc}`:name;
+  autoFillTitle();
+}
+
+function autoFillTitle(){
+  const prod=document.getElementById('prodVal').value;
+  const type=document.getElementById('workType').value;
+  const el=document.getElementById('title');
+  if(prod&&!el.value)el.value=`${TYPE_LABELS[type]} ${prod}`;
+}
+
+function onTypeChange(){
+  fillTemplate();
+  const prod=document.getElementById('prodVal').value;
+  const el=document.getElementById('title');
+  if(prod)el.value=`${TYPE_LABELS[document.getElementById('workType').value]} ${prod}`;
+}
+
+function fillTemplate(){document.getElementById('description').value=TMPL[document.getElementById('workType').value]||'';}
+
+function setDefaultTimes(){
+  const now=new Date();now.setMinutes(Math.ceil(now.getMinutes()/30)*30,0,0);
+  const end=new Date(now.getTime()+2*3600000);
+  document.getElementById('startTime').value=toLocal(now);
+  document.getElementById('endTime').value=toLocal(end);
+}
+
+function toLocal(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;}
+function clearErr(el){el.classList.remove('err');}
+function toggleBank(){bankOn=!bankOn;document.getElementById('bankTog').classList.toggle('on',bankOn);document.getElementById('badgeBank').classList.toggle('on',bankOn);}
+function toggleDowntime(){downtimeOn=!downtimeOn;document.getElementById('downtimeTog').classList.toggle('on',downtimeOn);document.getElementById('downtimeField').style.display=downtimeOn?'block':'none';if(!downtimeOn)document.getElementById('downtimeMin').value='';}
+function toggleTheme(){const cur=document.documentElement.getAttribute('data-theme');const nxt=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',nxt);localStorage.setItem('gc_theme',nxt);document.getElementById('themeBtn').textContent=nxt==='dark'?'☀️':'🌙';}
+
+function switchTab(tab,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tpanel').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');document.getElementById('tab-'+tab).classList.add('on');
+}
+
+function setFilter(f,btn){filter=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderEvents();}
+function setSort(s,btn){sort=s;document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderEvents();}
+
+function signIn(){
+  const client=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,
+    scope:'https://www.googleapis.com/auth/calendar.events',
+    callback:r=>{
+      if(r.error){showToast('error','Ошибка: '+r.error);return;}
+      token=r.access_token;localStorage.setItem('gc_tok',token);showApp();loadEvents();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function signOut(){localStorage.removeItem('gc_tok');token=null;document.getElementById('app').classList.remove('on');document.getElementById('authPage').style.display='flex';document.getElementById('userArea').innerHTML='';}
+function showApp(){document.getElementById('authPage').style.display='none';document.getElementById('app').classList.add('on');document.getElementById('userArea').innerHTML=`<div class="ubtn" onclick="signOut()">Выйти</div>`;}
+
+async function submitEvent(){
+  const title=document.getElementById('title').value.trim();
+  const product=document.getElementById('prodVal').value;
+  const start=document.getElementById('startTime').value;
+  const end=document.getElementById('endTime').value;
+  const type=document.getElementById('workType').value;
+  const desc=document.getElementById('description').value.trim();
+  const dtMin=document.getElementById('downtimeMin').value;
+  const slackUrl=document.getElementById('slackWebhook').value.trim();
+
+  let valid=true;
+  if(!title){document.getElementById('title').classList.add('err');valid=false;}
+  if(!start){document.getElementById('startTime').classList.add('err');valid=false;}
+  if(!end){document.getElementById('endTime').classList.add('err');valid=false;}
+  if(!valid){showToast('error','Заполни обязательные поля');return;}
+  if(new Date(end)<=new Date(start)){showToast('error','Конец должен быть позже начала');return;}
+
+  if(slackUrl)localStorage.setItem('gc_slack',slackUrl);
+
+  const downtimeLine=downtimeOn?`\nДаунтайм: Да${dtMin?' — '+dtMin+' мин':''}`:'\nДаунтайм: Нет';
+  const bankLine=bankOn?'\nЗатрагивает Freedom Bank: Да':'\nЗатрагивает Freedom Bank: Нет';
+  const fullDesc=desc+downtimeLine+bankLine;
+  const fullTitle=product?`[${product}] ${title}`:title;
+
+  const event={
+    summary:fullTitle,description:fullDesc,
+    start:{dateTime:new Date(start).toISOString(),timeZone:'Asia/Almaty'},
+    end:{dateTime:new Date(end).toISOString(),timeZone:'Asia/Almaty'},
+    colorId:bankOn?'11':downtimeOn?'6':'1',
+  };
+
+  document.getElementById('submitBtn').disabled=true;
+  showToast('loading','Добавляю...');
+
+  try{
+    const created=await createEvent(CAL_INTERNAL,event);
+    if(bankOn)await createEvent(CAL_BANK,event);
+    if(slackUrl)await sendSlack(slackUrl,{title:fullTitle,type:TYPE_LABELS[type],product,start,end,downtime:downtimeOn,dtMin,bank:bankOn,htmlLink:created.htmlLink});
+    showToast('success',bankOn?'✓ Добавлено в оба календаря':'✓ Добавлено во внутренний календарь');
+    resetForm();loadEvents();
+  }catch(e){
+    showToast('error','Ошибка: '+(e.message||'проверь доступ'));
+  }finally{
+    document.getElementById('submitBtn').disabled=false;
+  }
+}
+
+function resetForm(){
+  document.getElementById('title').value='';document.getElementById('description').value='';
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  document.getElementById('prodVal').value='';document.getElementById('prodDisplay').value='';
+  setDefaultTimes();fillTemplate();
+  if(bankOn)toggleBank();if(downtimeOn)toggleDowntime();
+}
+
+async function sendSlack(webhookUrl,data){
+  const start=new Date(data.start);const end=new Date(data.end);
+  const fmt=d=>d.toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Almaty'});
+  const color=TYPE_COLORS[Object.keys(TYPE_LABELS).find(k=>TYPE_LABELS[k]===data.type)||'release'];
+  const payload={attachments:[{color,blocks:[
+    {type:'section',text:{type:'mrkdwn',text:`📅 *Плановые работы*\n*${data.title}*`}},
+    {type:'section',fields:[
+      {type:'mrkdwn',text:`*Тип*\n${data.type}`},{type:'mrkdwn',text:`*Продукт*\n${data.product||'—'}`},
+      {type:'mrkdwn',text:`*Начало*\n${fmt(start)}`},{type:'mrkdwn',text:`*Конец*\n${fmt(end)}`},
+      {type:'mrkdwn',text:`*Даунтайм*\n${data.downtime?(data.dtMin?data.dtMin+' мин':'Да'):'Нет'}`},
+      {type:'mrkdwn',text:`*Freedom Bank*\n${data.bank?'✅ Да':'Нет'}`},
+    ]},
+    data.htmlLink?{type:'actions',elements:[{type:'button',text:{type:'plain_text',text:'Открыть в Google Calendar'},url:data.htmlLink}]}:null,
+  ].filter(Boolean)}]};
+  await fetch(webhookUrl,{method:'POST',body:JSON.stringify(payload)});
+}
+
+async function createEvent(calId,event){
+  const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(event)});
+  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||r.statusText);}
+  return r.json();
+}
+
+async function deleteEvent(calId,evId){
+  const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${evId}`,{method:'DELETE',headers:{Authorization:`Bearer ${token}`}});
+  return r.ok||r.status===204;
+}
+
+async function loadEvents(){
+  document.getElementById('elist').innerHTML='<div class="empty">Загружаю...</div>';
+  try{
+    const now=new Date().toISOString();
+    const max=new Date(Date.now()+21*86400000).toISOString();
+    const [iR,bR]=await Promise.all([fetchEvents(CAL_INTERNAL,now,max),fetchEvents(CAL_BANK,now,max)]);
+    // FIX: match by title+time to detect bank events correctly
+    const bankKeys=new Set((bR.items||[]).map(e=>`${e.summary}|${e.start.dateTime||e.start.date}`));
+    const bankIdMap={};
+    (bR.items||[]).forEach(e=>{bankIdMap[`${e.summary}|${e.start.dateTime||e.start.date}`]=e.id;});
+    allEvents=(iR.items||[]).map(e=>{
+      const key=`${e.summary}|${e.start.dateTime||e.start.date}`;
+      return{...e,isBank:bankKeys.has(key),bankEvId:bankIdMap[key]||null,hasDowntime:(e.description||'').includes('Даунтайм: Да'),htmlLink:e.htmlLink||''};
+    });
+    renderEvents();updateBanner();
+  }catch{document.getElementById('elist').innerHTML='<div class="empty">Не удалось загрузить</div>';}
+}
+
+async function fetchEvents(calId,tMin,tMax){
+  const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?timeMin=${tMin}&timeMax=${tMax}&singleEvents=true&orderBy=startTime&maxResults=50`,{headers:{Authorization:`Bearer ${token}`}});
+  if(!r.ok)return{items:[]};return r.json();
+}
+
+function updateBanner(){
+  const today=new Date().toDateString();
+  const n=allEvents.filter(e=>new Date(e.start.dateTime||e.start.date).toDateString()===today&&e.hasDowntime).length;
+  const b=document.getElementById('banner');
+  if(n){b.classList.remove('hidden');document.getElementById('bannerText').textContent=`Сегодня ${n} ${n===1?'событие':'события'} с даунтаймом`;}
+  else b.classList.add('hidden');
+}
+
+function renderEvents(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase();
+  let events=allEvents.filter(e=>{
+    if(filter==='bank')return e.isBank;if(filter==='int')return !e.isBank;if(filter==='down')return e.hasDowntime;return true;
+  }).filter(e=>!q||(e.summary||'').toLowerCase().includes(q)||(e.description||'').toLowerCase().includes(q));
+  if(sort==='product')events.sort((a,b)=>(a.summary||'').localeCompare(b.summary||''));
+  const el=document.getElementById('elist');
+  if(!events.length){el.innerHTML='<div class="empty">Нет событий</div>';return;}
+  el.innerHTML=events.map(e=>{
+    const start=new Date(e.start.dateTime||e.start.date);
+    const end=new Date(e.end.dateTime||e.end.date);
+    const dateStr=start.toLocaleDateString('ru-RU',{weekday:'short',day:'numeric',month:'short'});
+    const timeStr=`${pad(start.getHours())}:${pad(start.getMinutes())} – ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+    const bankTag=e.isBank?'<span class="tag bank">🏦 Freedom Bank</span>':'<span class="tag int">🔒 Внутренний</span>';
+    const downTag=e.hasDowntime?'<span class="tag down">⚠️ Даунтайм</span>':'';
+    const warn=e.hasDowntime?'⚠️ ':'';
+    const isExp=expandedId===e.id;
+    const desc=e.description?`<div class="ev-desc">${e.description}</div>`:'';
+    const editUrl=e.htmlLink||'';
+    const expanded=isExp?`<div class="ev-body">${desc}<div class="ev-acts">
+      <button class="eabtn" onclick="window.open('${editUrl}','_blank');event.stopPropagation()">✏️ Изменить</button>
+      <button class="eabtn copy" onclick="copyLink('${editUrl}');event.stopPropagation()">🔗 Скопировать</button>
+      <button class="eabtn" onclick="duplicateEvent(${JSON.stringify({summary:e.summary,description:e.description}).replace(/"/g,'&quot;')});event.stopPropagation()">📋 Повторить</button>
+      <button class="eabtn danger" onclick="confirmDelete('${e.id}','${e.isBank}','${e.bankEvId||''}');event.stopPropagation()">🗑 Удалить</button>
+    </div></div>`:'';
+    return `<div class="ev${isExp?' exp':''}" onclick="toggleExpand('${e.id}')">
+      <div class="ev-top">
+        <div class="ev-dot" style="background:#5b7fff"></div>
+        <div class="ev-inf">
+          <div class="ev-name">${warn}${e.summary||'Без названия'}</div>
+          <div class="ev-meta">${dateStr} · ${timeStr}</div>
+        </div>
+        <div class="ev-tags">${bankTag}${downTag}</div>
+      </div>${expanded}
+    </div>`;
+  }).join('');
+}
+
+function toggleExpand(id){expandedId=expandedId===id?null:id;renderEvents();}
+function copyLink(url){if(!url){showToast('error','Нет ссылки');return;}navigator.clipboard.writeText(url).then(()=>showToast('success','✓ Ссылка скопирована'));}
+function duplicateEvent(e){document.getElementById('title').value=(e.summary||'').replace(/^\[.*?\]\s*/,'');document.getElementById('description').value=e.description||'';setDefaultTimes();showToast('success','Скопировано — измени дату и добавь');document.querySelector('.rpanel').scrollTo({top:0,behavior:'smooth'});}
+
+async function confirmDelete(intId,isBank,bankEvId){
+  if(!confirm('Удалить событие из календаря?'))return;
+  try{
+    await deleteEvent(CAL_INTERNAL,intId);
+    if(isBank==='true'&&bankEvId)await deleteEvent(CAL_BANK,bankEvId);
+    showToast('success','✓ Удалено');expandedId=null;loadEvents();
+  }catch{showToast('error','Ошибка удаления');}
+}
+
+function pad(n){return String(n).padStart(2,'0');}
+let toastTimer;
+function showToast(type,msg){
+  const el=document.getElementById('toast');clearTimeout(toastTimer);
+  el.className='toast '+type;el.innerHTML=type==='loading'?`<div class="spin"></div>${msg}`:msg;
+  el.classList.add('show');
+  if(type!=='loading')toastTimer=setTimeout(()=>el.classList.remove('show'),3500);
+}
+</script>
+</body>
+</html>
