@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maintenance — GC Support</title>
+<style>
+:root[data-theme="dark"]{--bg:#0d0f18;--sf:#141720;--s2:#1a1e2e;--s3:#20253a;--br:#252b42;--tx:#e2e5f0;--t2:#7b849e;--t3:#3d4460;--ac:#5b7fff;--rd:#ff6b6b;--gn:#3dd68c;--am:#ffc247;--pu:#a78bfa;--cy:#38bdf8}
+:root[data-theme="light"]{--bg:#f0f2f8;--sf:#fff;--s2:#f5f6fb;--s3:#eaecf5;--br:#dde1f0;--tx:#1a1f36;--t2:#6b7499;--t3:#b0b8d4;--ac:#3b6ef5;--rd:#e03e3e;--gn:#1a9e5c;--am:#d4900a;--pu:#6d3fc5;--cy:#0284c7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,sans-serif;min-height:100vh;font-size:14px}
+.hdr{background:var(--sf);border-bottom:1px solid var(--br);height:52px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
+.logo-ic{width:28px;height:28px;background:var(--ac);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.hdr-r{display:flex;align-items:center;gap:8px}
+.ib{background:var(--s2);border:1px solid var(--br);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;color:var(--t2);transition:all .15s;font-family:inherit}
+.ib:hover{border-color:var(--ac);color:var(--tx)}
+.ub{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--br);border-radius:8px;padding:5px 10px;font-size:12px;color:var(--t2);cursor:pointer;transition:all .15s}
+.ub:hover{border-color:var(--rd);color:var(--rd)}
+
+/* ONBOARDING */
+.ob-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(4px)}
+.ob-box{background:var(--sf);border:1px solid var(--br);border-radius:20px;max-width:540px;width:100%;overflow:hidden}
+.ob-hero{background:linear-gradient(135deg,#1a2550,#0d1530);padding:28px;text-align:center}
+.ob-hero h2{font-size:20px;font-weight:700;margin:12px 0 6px}
+.ob-hero p{font-size:13px;color:var(--t2);line-height:1.6}
+.ob-steps{padding:20px;display:flex;flex-direction:column;gap:10px}
+.ob-step{display:flex;align-items:flex-start;gap:10px;padding:10px;background:var(--s2);border-radius:10px}
+.ob-n{width:26px;height:26px;background:var(--ac);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.ob-info h4{font-size:13px;font-weight:600;margin-bottom:2px}
+.ob-info p{font-size:12px;color:var(--t2);line-height:1.5}
+.ob-foot{padding:14px 20px;border-top:1px solid var(--br);display:flex;justify-content:flex-end}
+.ob-btn{background:var(--ac);color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+
+/* AUTH */
+.auth{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 52px);padding:24px}
+.auth-box{background:var(--sf);border:1px solid var(--br);border-radius:20px;padding:44px 36px;max-width:380px;width:100%;text-align:center}
+.auth-box h1{font-size:22px;font-weight:700;margin:14px 0 8px}
+.auth-box p{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:28px}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.15);transition:opacity .15s}
+.gbtn:hover{opacity:.9}
+
+/* APP LAYOUT */
+.app{display:none}
+.app.on{display:flex;height:calc(100vh - 52px)}
+.lp{width:360px;flex-shrink:0;border-right:1px solid var(--br);background:var(--sf);display:flex;flex-direction:column;overflow:hidden}
+.rp{flex:1;overflow-y:auto;padding:24px}
+
+/* BANNER */
+.bnr{background:linear-gradient(135deg,color-mix(in srgb,var(--am) 15%,transparent),color-mix(in srgb,var(--rd) 10%,transparent));border-bottom:1px solid color-mix(in srgb,var(--am) 30%,transparent);padding:9px 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--am);flex-shrink:0}
+.bnr.hide{display:none}
+
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0}
+.tab{flex:1;padding:11px;text-align:center;font-size:11px;font-weight:700;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
+.tab.on{color:var(--ac);border-bottom-color:var(--ac)}
+.tp{display:none;flex:1;flex-direction:column;overflow:hidden}
+.tp.on{display:flex}
+
+/* SEARCH + FILTERS */
+.sw{padding:10px 12px;border-bottom:1px solid var(--br);flex-shrink:0}
+.si{width:100%;background:var(--s2);border:1px solid var(--br);border-radius:8px;color:var(--tx);font-family:inherit;font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s}
+.si:focus{border-color:var(--ac)}
+.fls{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--br);flex-shrink:0;flex-wrap:wrap}
+.fb{padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid var(--br);background:transparent;color:var(--t2);cursor:pointer;transition:all .15s;font-family:inherit}
+.fb.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.sv{padding:6px 12px;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:6px;flex-shrink:0}
+.sl{font-size:10px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.sb{padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;border:1px solid var(--br);background:transparent;color:var(--t2);cursor:pointer;font-family:inherit;transition:all .15s}
+.sb.on{background:var(--s3);color:var(--tx);border-color:var(--t2)}
+
+/* EVENTS */
+.el{flex:1;overflow-y:auto}
+.ev{padding:11px 14px;border-bottom:1px solid var(--br);cursor:pointer;transition:background .1s}
+.ev:hover,.ev.exp{background:var(--s2)}
+.ev-t{display:flex;align-items:flex-start;gap:8px}
+.ev-d{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.ev-i{flex:1;min-width:0}
+.ev-n{font-size:12px;font-weight:600;line-height:1.4;margin-bottom:2px}
+.ev-m{font-size:11px;color:var(--t2)}
+.ev-tgs{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.tg{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}
+.tg.bk{background:color-mix(in srgb,var(--rd) 15%,transparent);color:var(--rd)}
+.tg.in{background:color-mix(in srgb,var(--ac) 15%,transparent);color:var(--ac)}
+.tg.dw{background:color-mix(in srgb,var(--am) 15%,transparent);color:var(--am)}
+.ev-b{padding:8px 0 4px}
+.ev-dc{font-size:11px;color:var(--t2);line-height:1.6;white-space:pre-wrap;background:var(--s3);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-family:monospace;max-height:200px;overflow-y:auto}
+.ev-ac{display:flex;gap:5px;flex-wrap:wrap}
+.eab{flex:1;min-width:70px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid var(--br);background:transparent;color:var(--t2);cursor:pointer;transition:all .15s;font-family:inherit}
+.eab:hover{border-color:var(--ac);color:var(--ac)}
+.eab.dg:hover{border-color:var(--rd);color:var(--rd)}
+.eab.cp:hover{border-color:var(--gn);color:var(--gn)}
+.emp{padding:32px 14px;text-align:center;color:var(--t3);font-size:13px}
+
+/* CAL EMBED */
+.ce{flex:1}
+.ce iframe{width:100%;height:100%;border:none;min-height:400px}
+
+/* HOWTO */
+.hw{flex:1;overflow-y:auto;padding:16px}
+.hw-sec{margin-bottom:18px}
+.hw-sec h3{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.hw-it{display:flex;gap:10px;padding:10px;background:var(--s2);border-radius:8px;margin-bottom:6px}
+.hw-ic{font-size:18px;flex-shrink:0}
+.hw-tx h4{font-size:12px;font-weight:600;margin-bottom:2px}
+.hw-tx p{font-size:11px;color:var(--t2);line-height:1.5}
+
+/* FORM */
+.fd{display:flex;flex-direction:column;gap:5px}
+.fd label{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em}
+.fd-h{font-size:11px;color:var(--t3);margin-top:2px}
+.fd input,.fd select,.fd textarea{background:var(--s2);border:1px solid var(--br);border-radius:8px;color:var(--tx);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s;width:100%}
+.fd input:focus,.fd select:focus,.fd textarea:focus{border-color:var(--ac)}
+.fd input.err{border-color:var(--rd)}
+.fd textarea{resize:vertical;min-height:130px;font-family:'Courier New',monospace;font-size:11px;line-height:1.7}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* PILLS */
+.pg{margin-bottom:10px}
+.pg-l{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.pp{display:flex;flex-wrap:wrap;gap:5px}
+.pl{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;border:1px solid var(--br);background:var(--s3);color:var(--t2);cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:4px}
+.pl:hover{border-color:var(--ac);color:var(--ac);background:color-mix(in srgb,var(--ac) 10%,transparent)}
+.pl.on{border-color:var(--ac);color:var(--ac);background:color-mix(in srgb,var(--ac) 15%,transparent);font-weight:700}
+.pl.it:hover,.pl.it.on{border-color:var(--pu);color:var(--pu);background:color-mix(in srgb,var(--pu) 12%,transparent)}
+.pl.if:hover,.pl.if.on{border-color:var(--cy);color:var(--cy);background:color-mix(in srgb,var(--cy) 10%,transparent)}
+.pl-s{font-size:9px;color:var(--t3);font-weight:400}
+.pl.on .pl-s{color:inherit;opacity:.7}
+
+/* TOGGLE */
+.tr{display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--br);border-radius:10px;padding:12px 14px}
+.tl .t1{font-size:13px;font-weight:500}
+.tl .t2{font-size:11px;color:var(--t2);margin-top:2px}
+.tg-sw{width:38px;height:21px;background:var(--br);border-radius:11px;cursor:pointer;position:relative;transition:background .2s;border:none;flex-shrink:0}
+.tg-sw.on{background:var(--ac)}
+.tg-sw::after{content:'';width:15px;height:15px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.tg-sw.on::after{left:20px}
+.cbs{display:flex;gap:6px}
+.cb{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;opacity:.3;transition:opacity .2s}
+.cb.on{opacity:1}
+.cb.ci{background:color-mix(in srgb,var(--ac) 12%,transparent);color:var(--ac);border:1px solid color-mix(in srgb,var(--ac) 25%,transparent)}
+.cb.cb2{background:color-mix(in srgb,var(--rd) 12%,transparent);color:var(--rd);border:1px solid color-mix(in srgb,var(--rd) 25%,transparent)}
+.bd{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:14px 18px;border-radius:12px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.3);transform:translateY(80px);opacity:0;transition:all .25s;pointer-events:none;max-width:340px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{background:var(--gn);color:#fff}
+.toast.er{background:var(--rd);color:#fff}
+.toast.ld{background:var(--sf);border:1px solid var(--br);color:var(--tx)}
+
+.fc{background:var(--sf);border:1px solid var(--br);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.fc-h{padding:14px 18px;border-bottom:1px solid var(--br);font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.08em}
+.fc-b{padding:18px;display:flex;flex-direction:column;gap:14px}
+.pb{background:var(--ac);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;width:100%;transition:opacity .15s;font-family:inherit}
+.pb:hover{opacity:.9}
+.pb:disabled{opacity:.4;cursor:not-allowed}
+.pt{font-size:22px;font-weight:700;margin-bottom:4px}
+.ps{font-size:13px;color:var(--t2);margin-bottom:20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sp{width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div class="ob-bg" id="ob" style="display:none">
+  <div class="ob-box">
+    <div class="ob-hero">
+      <div style="font-size:40px">📅</div>
+      <h2>GC Maintenance Calendar</h2>
+      <p>Сервис для анонса плановых работ — релизов, миграций и техработ.<br>Заполни форму, и все нужные команды узнают о работах заранее.</p>
+    </div>
+    <div class="ob-steps">
+      <div class="ob-step"><div class="ob-n">1</div><div class="ob-info"><h4>Выбери тип работ и продукт</h4><p>Релиз, хотфикс, миграция или техработы. Название заполнится автоматически.</p></div></div>
+      <div class="ob-step"><div class="ob-n">2</div><div class="ob-info"><h4>Укажи время и заполни описание</h4><p>Шаблон подставится сам. Заполни: команда, эффект на прод, ответственный.</p></div></div>
+      <div class="ob-step"><div class="ob-n">3</div><div class="ob-info"><h4>Отметь затрагивает ли Freedom Bank</h4><p>Если работы могут повлиять на сервисы банка — включи тоггл. Событие попадёт в отдельный календарь NOC.</p></div></div>
+      <div class="ob-step"><div class="ob-n">4</div><div class="ob-info"><h4>Нажми "Добавить в календарь"</h4><p>Событие появится в нужных календарях автоматически.</p></div></div>
+    </div>
+    <div class="ob-foot"><button class="ob-btn" onclick="closeOb()">Понятно, начнём →</button></div>
+  </div>
+</div>
+
+<div class="hdr">
+  <div class="logo"><div class="logo-ic">📅</div>GC Maintenance</div>
+  <div class="hdr-r">
+    <button class="ib" id="themeBtn" onclick="toggleTheme()">☀️</button>
+    <button class="ib" onclick="showOb()">❓ Как пользоваться</button>
+    <div id="userArea"></div>
+  </div>
+</div>
+
+<!-- AUTH -->
+<div class="auth" id="authPage">
+  <div class="auth-box">
+    <div style="font-size:44px">🚀</div>
+    <h1>Плановые работы</h1>
+    <p>Все релизы, миграции и техработы в одном месте. Войди через корпоративный аккаунт @globerce.capital</p>
+    <button class="gbtn" onclick="signIn()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+      Войти через Google
+    </button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="lp">
+    <div id="bnr" class="bnr hide">⚠️ <span id="bnrTx"></span></div>
+    <div class="tabs">
+      <div class="tab on" onclick="switchTab('ev',this)">События</div>
+      <div class="tab" onclick="switchTab('cal',this)">Календарь</div>
+      <div class="tab" onclick="switchTab('hw',this)">Помощь</div>
+    </div>
+
+    <!-- EVENTS TAB -->
+    <div class="tp on" id="tab-ev">
+      <div class="sw"><input class="si" id="srch" placeholder="🔍 Поиск..." oninput="renderEv()"/></div>
+      <div class="fls">
+        <button class="fb on" onclick="setFl('all',this)">Все</button>
+        <button class="fb" onclick="setFl('bk',this)">🏦 Freedom Bank</button>
+        <button class="fb" onclick="setFl('in',this)">🔒 Внутренние</button>
+        <button class="fb" onclick="setFl('dw',this)">⚠️ Даунтайм</button>
+      </div>
+      <div class="sv">
+        <span class="sl">Сортировка:</span>
+        <button class="sb on" onclick="setSrt('dt',this)">По дате</button>
+        <button class="sb" onclick="setSrt('pr',this)">По продукту</button>
+      </div>
+      <div class="el" id="evList"><div class="emp">Загрузка...</div></div>
+    </div>
+
+    <!-- CALENDAR TAB -->
+    <div class="tp" id="tab-cal">
+      <div class="ce">
+        <iframe src="https://calendar.google.com/calendar/embed?src=c_4fc52cbf4dac1d8de39d63eaa56603f245ae74d717f478f1a36f48fce549228d%40group.calendar.google.com&ctz=Asia%2FAlmaty&showTitle=0&showNav=1&showPrint=0&showTabs=0&showCalendars=0&mode=AGENDA&hl=ru" frameborder="0" scrolling="no"></iframe>
+      </div>
+    </div>
+
+    <!-- HELP TAB -->
+    <div class="tp" id="tab-hw">
+      <div class="hw">
+        <div class="hw-sec">
+          <h3>📋 Когда добавлять событие?</h3>
+          <div class="hw-it"><div class="hw-ic">🚀</div><div class="hw-tx"><h4>Релиз</h4><p>Выкатываешь новую версию сервиса в прод</p></div></div>
+          <div class="hw-it"><div class="hw-ic">🔥</div><div class="hw-tx"><h4>Хотфикс</h4><p>Срочный фикс критической проблемы на проде</p></div></div>
+          <div class="hw-it"><div class="hw-ic">🗃️</div><div class="hw-tx"><h4>Миграция БД</h4><p>Изменения в структуре базы данных</p></div></div>
+          <div class="hw-it"><div class="hw-ic">🔧</div><div class="hw-tx"><h4>Техработы</h4><p>Обслуживание серверов, обновление зависимостей</p></div></div>
+          <div class="hw-it"><div class="hw-ic">⚙️</div><div class="hw-tx"><h4>Инфраструктура</h4><p>Работы на уровне K8s, PostgreSQL, S3, сети</p></div></div>
+        </div>
+        <div class="hw-sec">
+          <h3>🏦 Затрагивает Freedom Bank — когда включать?</h3>
+          <div class="hw-it"><div class="hw-ic">✅</div><div class="hw-tx"><h4>Включай если</h4><p>Работы могут повлиять на продукты банка: ипотека, авто, потребкредит, collection и другие из списка Freedom Bank</p></div></div>
+          <div class="hw-it"><div class="hw-ic">❌</div><div class="hw-tx"><h4>Не включай если</h4><p>Это только внутренние сервисы: Loggy, Brokerage, NIET — или работы без влияния на банк</p></div></div>
+        </div>
+        <div class="hw-sec">
+          <h3>⚠️ Даунтайм — что это?</h3>
+          <div class="hw-it"><div class="hw-ic">⏱️</div><div class="hw-tx"><h4>Сервис будет недоступен</h4><p>Если во время работ пользователи не смогут пользоваться сервисом — включи даунтайм и укажи примерное время в минутах</p></div></div>
+        </div>
+        <div class="hw-sec">
+          <h3>❓ Проблемы?</h3>
+          <div class="hw-it"><div class="hw-ic">💬</div><div class="hw-tx"><h4>Пиши в поддержку</h4><p>Напиши Жану Ержанулы или в канал #incidents</p></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="rp">
+    <div class="pt">Добавить событие</div>
+    <div class="ps">Заполни форму — событие появится в нужных календарях автоматически</div>
+    <div class="fc">
+      <div class="fc-h">Детали события</div>
+      <div class="fc-b">
+
+        <div class="fr">
+          <div class="fd">
+            <label>Тип работ</label>
+            <select id="wt" onchange="onTypeChange()">
+              <option value="release">🚀 Релиз</option>
+              <option value="hotfix">🔥 Хотфикс</option>
+              <option value="migration">🗃️ Миграция БД</option>
+              <option value="maintenance">🔧 Техработы</option>
+              <option value="infra">⚙️ Инфраструктура</option>
+            </select>
+          </div>
+          <div class="fd">
+            <label>Продукт / система</label>
+            <input id="pdDsp" placeholder="Выбери ниже ↓" readonly style="cursor:default"/>
+            <input type="hidden" id="pdVal"/>
+          </div>
+        </div>
+
+        <div class="fd">
+          <label>Название события</label>
+          <input type="text" id="title" placeholder="Автозаполнится при выборе продукта" oninput="this.classList.remove('err')"/>
+          <div class="fd-h">Кратко: что делается и в каком продукте</div>
+        </div>
+
+        <div>
+          <div class="pg"><div class="pg-l">Конвейеры Freedom Bank</div><div class="pp" id="pgBk"></div></div>
+          <div class="pg"><div class="pg-l">Другие банки</div><div class="pp" id="pgOb"></div></div>
+          <div class="pg"><div class="pg-l">Внутренние инструменты</div><div class="pp" id="pgIn"></div></div>
+          <div class="pg"><div class="pg-l">Инфраструктура</div><div class="pp" id="pgIf"></div></div>
+        </div>
+
+        <div class="fr">
+          <div class="fd">
+            <label>Начало работ</label>
+            <input type="datetime-local" id="st" oninput="this.classList.remove('err')"/>
+          </div>
+          <div class="fd">
+            <label>Конец работ</label>
+            <input type="datetime-local" id="et" oninput="this.classList.remove('err')"/>
+          </div>
+        </div>
+
+        <div class="fd">
+          <label>Описание</label>
+          <textarea id="desc"></textarea>
+          <div class="fd-h">Заполни шаблон — команда, ответственный, эффект на прод</div>
+        </div>
+
+        <div class="tr">
+          <div class="tl"><div class="t1">⚠️ Ожидается даунтайм</div><div class="t2">Сервис будет временно недоступен во время работ</div></div>
+          <button class="tg-sw" id="dtTog" onclick="toggleDT()"></button>
+        </div>
+        <div id="dtFld" style="display:none">
+          <div class="fd">
+            <label>Длительность даунтайма (минут)</label>
+            <input type="number" id="dtMin" placeholder="Например: 15" min="1"/>
+            <div class="fd-h">Укажи примерное время — даже если не уверен</div>
+          </div>
+        </div>
+
+        <div class="tr">
+          <div class="tl"><div class="t1">🏦 Затрагивает Freedom Bank</div><div class="t2">Работы могут повлиять на сервисы банка — добавить в календарь NOC</div></div>
+          <button class="tg-sw" id="bkTog" onclick="toggleBK()"></button>
+        </div>
+
+        <div class="cbs">
+          <div class="cb ci on"><div class="bd"></div>Внутренний календарь</div>
+          <div class="cb cb2" id="cbBk"><div class="bd"></div>Календарь Freedom Bank</div>
+        </div>
+
+        <button class="pb" id="subBtn" onclick="submit()">Добавить в календарь →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const CID = '264055259850-p86g7q67i8klt4p9mtbciug405ak0he3.apps.googleusercontent.com';
+const CAL_BK = 'c_4fc52cbf4dac1d8de39d63eaa56603f245ae74d717f478f1a36f48fce549228d@group.calendar.google.com';
+const CAL_IN = 'c_882f3f8effd187ba0cc4929f13c8c55986eba3ba7e51ce223113b57b1bef25c3@group.calendar.google.com';
+
+const BK_P = [
+  {n:'FFBDM',d:'Ипотека'},{n:'CFF',d:'Универсальные кабинеты'},{n:'AC',d:'Авто'},
+  {n:'FLLCM',d:'Кредит ИП'},{n:'FFC',d:'МФО Freedom Finance'},{n:'FFCT',d:'Потребкредит'},
+  {n:'COLBANKM',d:'Collection'},{n:'FBS',d:'Freedom Business'},{n:'FFIL',d:'Кредит под залог'},
+  {n:'LLPC',d:'Кредит ТОО'},{n:'UINT',d:'Unified Integrations'},{n:'Lenta',d:'Freedom Lenta'},
+  {n:'Карточный конвейер',d:'Казахстан'},{n:'Карточный конвейер TJ',d:'Таджикистан'},
+];
+const OB_P = [
+  {n:'Sky Bank',d:'Украина'},{n:'Optima Bank',d:'Кыргызстан'},
+];
+const IN_P = [
+  {n:'Loggy',d:''},{n:'Brokerage',d:'Брокерская платформа'},{n:'NIET',d:''},
+];
+const IF_P = [
+  {n:'PostgreSQL',d:'БД / Patroni'},{n:'Kubernetes',d:'K8s кластер'},
+  {n:'S3/VAST',d:'Хранилище'},{n:'HAProxy',d:'Балансировщик'},
+  {n:'Сеть',d:'Сетевая инфра'},{n:'Другое',d:''},
+];
+const TL = {release:'Релиз',hotfix:'Хотфикс',migration:'Миграция БД',maintenance:'Техработы',infra:'Инфраструктура'};
+const TMPL = {
+  release:`Сервис / продукт: \nКоманда: \nТип: Релиз\nЭффект на прод: без даунтайма / частичный / полный\nДлительность недоступности: \nЗатронутые URL / мониторы: \nОтветственный: \nОткатываемость: есть rollback / нет`,
+  hotfix:`Сервис / продукт: \nКоманда: \nТип: Хотфикс\nПроблема: \nЭффект: без даунтайма / частичный / полный\nДлительность недоступности: \nОтветственный: \nОткатываемость: есть rollback / нет`,
+  migration:`Сервис / продукт: \nКоманда: \nТип: Миграция БД\nЗатронутые таблицы / БД: \nЭффект: без даунтайма / частичный / полный\nДлительность недоступности: \nОтветственный: \nОткатываемость: есть rollback / нет`,
+  maintenance:`Сервис / продукт: \nКоманда: \nТип: Технические работы\nЧто делается: \nЭффект: без даунтайма / частичный / полный\nДлительность недоступности: \nОтветственный: `,
+  infra:`Компонент: \nКоманда: \nТип: Инфраструктура\nЧто делается: \nЭффект: без даунтайма / частичный / полный\nЗатронутые сервисы: \nДлительность: \nОтветственный: `,
+};
+
+let tok=null, bkOn=false, dtOn=false, fl='all', srt='dt', evs=[], expId=null;
+
+window.onload = function() {
+  buildPills('pgBk', BK_P, '');
+  buildPills('pgOb', OB_P, 'it');
+  buildPills('pgIn', IN_P, 'it');
+  buildPills('pgIf', IF_P, 'if');
+  setDefTimes();
+  fillTmpl();
+  var th = localStorage.getItem('gc_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', th);
+  document.getElementById('themeBtn').textContent = th === 'dark' ? '☀️' : '🌙';
+  var saved = localStorage.getItem('gc_tok');
+  if (saved) { tok = saved; showApp(); loadEvs(); }
+  if (!localStorage.getItem('gc_ob_done')) { setTimeout(showOb, 400); }
+};
+
+function showOb() { document.getElementById('ob').style.display = 'flex'; }
+function closeOb() { document.getElementById('ob').style.display = 'none'; localStorage.setItem('gc_ob_done', '1'); }
+
+function buildPills(cid, list, cls) {
+  var el = document.getElementById(cid);
+  list.forEach(function(p) {
+    var d = document.createElement('div');
+    d.className = 'pl' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<span>' + p.n + '</span>' + (p.d ? '<span class="pl-s">' + p.d + '</span>' : '');
+    d.onclick = function() { selectPill(d, p.n, p.d); };
+    el.appendChild(d);
+  });
+}
+
+function selectPill(el, name, desc) {
+  document.querySelectorAll('.pl').forEach(function(p) { p.classList.remove('on'); });
+  el.classList.add('on');
+  document.getElementById('pdVal').value = name;
+  document.getElementById('pdDsp').value = desc ? name + ' — ' + desc : name;
+  var titleEl = document.getElementById('title');
+  if (!titleEl.value) {
+    titleEl.value = TL[document.getElementById('wt').value] + ' ' + name;
+  }
+}
+
+function onTypeChange() {
+  fillTmpl();
+  var prod = document.getElementById('pdVal').value;
+  if (prod) { document.getElementById('title').value = TL[document.getElementById('wt').value] + ' ' + prod; }
+}
+
+function fillTmpl() { document.getElementById('desc').value = TMPL[document.getElementById('wt').value] || ''; }
+
+function setDefTimes() {
+  var now = new Date();
+  now.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0);
+  var end = new Date(now.getTime() + 2 * 3600000);
+  document.getElementById('st').value = toLocal(now);
+  document.getElementById('et').value = toLocal(end);
+}
+
+function toLocal(d) {
+  var p = function(n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+function toggleBK() {
+  bkOn = !bkOn;
+  document.getElementById('bkTog').classList.toggle('on', bkOn);
+  document.getElementById('cbBk').classList.toggle('on', bkOn);
+}
+
+function toggleDT() {
+  dtOn = !dtOn;
+  document.getElementById('dtTog').classList.toggle('on', dtOn);
+  document.getElementById('dtFld').style.display = dtOn ? 'block' : 'none';
+  if (!dtOn) document.getElementById('dtMin').value = '';
+}
+
+function toggleTheme() {
+  var cur = document.documentElement.getAttribute('data-theme');
+  var nxt = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', nxt);
+  localStorage.setItem('gc_theme', nxt);
+  document.getElementById('themeBtn').textContent = nxt === 'dark' ? '☀️' : '🌙';
+}
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('on'); });
+  document.querySelectorAll('.tp').forEach(function(t) { t.classList.remove('on'); });
+  el.classList.add('on');
+  document.getElementById('tab-' + tab).classList.add('on');
+}
+
+function setFl(f, btn) {
+  fl = f;
+  document.querySelectorAll('.fb').forEach(function(b) { b.classList.remove('on'); });
+  btn.classList.add('on');
+  renderEv();
+}
+
+function setSrt(s, btn) {
+  srt = s;
+  document.querySelectorAll('.sb').forEach(function(b) { b.classList.remove('on'); });
+  btn.classList.add('on');
+  renderEv();
+}
+
+function signIn() {
+  var client = google.accounts.oauth2.initTokenClient({
+    client_id: CID,
+    scope: 'https://www.googleapis.com/auth/calendar.events',
+    callback: function(r) {
+      if (r.error) { toast('er', 'Ошибка: ' + r.error); return; }
+      tok = r.access_token;
+      localStorage.setItem('gc_tok', tok);
+      showApp();
+      loadEvs();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function signOut() {
+  localStorage.removeItem('gc_tok'); tok = null;
+  document.getElementById('app').classList.remove('on');
+  document.getElementById('authPage').style.display = 'flex';
+  document.getElementById('userArea').innerHTML = '';
+}
+
+function showApp() {
+  document.getElementById('authPage').style.display = 'none';
+  document.getElementById('app').classList.add('on');
+  document.getElementById('userArea').innerHTML = '<div class="ub" onclick="signOut()">Выйти</div>';
+}
+
+function submit() {
+  var title = document.getElementById('title').value.trim();
+  var prod = document.getElementById('pdVal').value;
+  var st = document.getElementById('st').value;
+  var et = document.getElementById('et').value;
+  var type = document.getElementById('wt').value;
+  var desc = document.getElementById('desc').value.trim();
+  var dtMin = document.getElementById('dtMin').value;
+
+  var valid = true;
+  if (!title) { document.getElementById('title').classList.add('err'); valid = false; }
+  if (!st) { document.getElementById('st').classList.add('err'); valid = false; }
+  if (!et) { document.getElementById('et').classList.add('err'); valid = false; }
+  if (!valid) { toast('er', 'Заполни обязательные поля'); return; }
+  if (new Date(et) <= new Date(st)) { toast('er', 'Конец должен быть позже начала'); return; }
+
+  var dtLine = dtOn ? ('\nДаунтайм: Да' + (dtMin ? ' — ' + dtMin + ' мин' : '')) : '\nДаунтайм: Нет';
+  var bkLine = bkOn ? '\nЗатрагивает Freedom Bank: Да' : '\nЗатрагивает Freedom Bank: Нет';
+  var fullDesc = desc + dtLine + bkLine;
+  var fullTitle = prod ? '[' + prod + '] ' + title : title;
+
+  var ev = {
+    summary: fullTitle, description: fullDesc,
+    start: { dateTime: new Date(st).toISOString(), timeZone: 'Asia/Almaty' },
+    end:   { dateTime: new Date(et).toISOString(), timeZone: 'Asia/Almaty' },
+    colorId: bkOn ? '11' : dtOn ? '6' : '1',
+  };
+
+  document.getElementById('subBtn').disabled = true;
+  toast('ld', 'Добавляю...');
+
+  createEv(CAL_IN, ev).then(function() {
+    var p2 = bkOn ? createEv(CAL_BK, ev) : Promise.resolve();
+    return p2;
+  }).then(function() {
+    toast('ok', bkOn ? '✓ Добавлено в оба календаря' : '✓ Добавлено во внутренний календарь');
+    resetForm();
+    loadEvs();
+  }).catch(function(e) {
+    toast('er', 'Ошибка: ' + (e.message || 'проверь доступ'));
+  }).finally(function() {
+    document.getElementById('subBtn').disabled = false;
+  });
+}
+
+function resetForm() {
+  document.getElementById('title').value = '';
+  document.getElementById('desc').value = '';
+  document.querySelectorAll('.pl').forEach(function(p) { p.classList.remove('on'); });
+  document.getElementById('pdVal').value = '';
+  document.getElementById('pdDsp').value = '';
+  setDefTimes(); fillTmpl();
+  if (bkOn) toggleBK();
+  if (dtOn) toggleDT();
+}
+
+function createEv(calId, ev) {
+  return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+    body: JSON.stringify(ev)
+  }).then(function(r) {
+    if (!r.ok) return r.json().then(function(e) { throw new Error(e.error && e.error.message || r.statusText); });
+    return r.json();
+  });
+}
+
+function delEv(calId, evId) {
+  return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events/' + evId, {
+    method: 'DELETE', headers: { Authorization: 'Bearer ' + tok }
+  });
+}
+
+function loadEvs() {
+  document.getElementById('evList').innerHTML = '<div class="emp">Загружаю...</div>';
+  var now = new Date().toISOString();
+  var max = new Date(Date.now() + 21 * 86400000).toISOString();
+  Promise.all([fetchEvs(CAL_IN, now, max), fetchEvs(CAL_BK, now, max)]).then(function(res) {
+    var iR = res[0], bR = res[1];
+    var bkKeys = new Set((bR.items || []).map(function(e) { return e.summary + '|' + (e.start.dateTime || e.start.date); }));
+    var bkIdMap = {};
+    (bR.items || []).forEach(function(e) { bkIdMap[e.summary + '|' + (e.start.dateTime || e.start.date)] = e.id; });
+    evs = (iR.items || []).map(function(e) {
+      var key = e.summary + '|' + (e.start.dateTime || e.start.date);
+      return Object.assign({}, e, {
+        isBank: bkKeys.has(key),
+        bkId: bkIdMap[key] || null,
+        hasDT: (e.description || '').includes('Даунтайм: Да'),
+        hl: e.htmlLink || ''
+      });
+    });
+    renderEv();
+    updateBnr();
+  }).catch(function() {
+    document.getElementById('evList').innerHTML = '<div class="emp">Не удалось загрузить</div>';
+  });
+}
+
+function fetchEvs(calId, tMin, tMax) {
+  return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events?timeMin=' + tMin + '&timeMax=' + tMax + '&singleEvents=true&orderBy=startTime&maxResults=50', {
+    headers: { Authorization: 'Bearer ' + tok }
+  }).then(function(r) {
+    if (r.status === 401) { localStorage.removeItem('gc_tok'); tok = null; signOut(); toast('er', 'Сессия истекла — войди снова'); return { items: [] }; }
+    if (!r.ok) return { items: [] };
+    return r.json();
+  });
+}
+
+function updateBnr() {
+  var today = new Date().toDateString();
+  var n = evs.filter(function(e) { return new Date(e.start.dateTime || e.start.date).toDateString() === today && e.hasDT; }).length;
+  var b = document.getElementById('bnr');
+  if (n) { b.classList.remove('hide'); document.getElementById('bnrTx').textContent = 'Сегодня ' + n + (n === 1 ? ' событие' : ' события') + ' с даунтаймом'; }
+  else b.classList.add('hide');
+}
+
+function renderEv() {
+  var q = (document.getElementById('srch').value || '').toLowerCase();
+  var list = evs.filter(function(e) {
+    if (fl === 'bk') return e.isBank;
+    if (fl === 'in') return !e.isBank;
+    if (fl === 'dw') return e.hasDT;
+    return true;
+  }).filter(function(e) {
+    return !q || (e.summary || '').toLowerCase().includes(q) || (e.description || '').toLowerCase().includes(q);
+  });
+  if (srt === 'pr') list.sort(function(a, b) { return (a.summary || '').localeCompare(b.summary || ''); });
+  var el = document.getElementById('evList');
+  if (!list.length) { el.innerHTML = '<div class="emp">Нет событий</div>'; return; }
+  el.innerHTML = list.map(function(e) {
+    var start = new Date(e.start.dateTime || e.start.date);
+    var end = new Date(e.end.dateTime || e.end.date);
+    var ds = start.toLocaleDateString('ru-RU', { weekday:'short', day:'numeric', month:'short' });
+    var ts = pad(start.getHours()) + ':' + pad(start.getMinutes()) + ' – ' + pad(end.getHours()) + ':' + pad(end.getMinutes());
+    var bkTag = e.isBank ? '<span class="tg bk">🏦 Freedom Bank</span>' : '<span class="tg in">🔒 Внутренний</span>';
+    var dwTag = e.hasDT ? '<span class="tg dw">⚠️ Даунтайм</span>' : '';
+    var warn = e.hasDT ? '⚠️ ' : '';
+    var isExp = expId === e.id;
+    var dc = e.description ? '<div class="ev-dc">' + e.description + '</div>' : '';
+    var editUrl = e.hl || '';
+    var acts = isExp ? '<div class="ev-b">' + dc + '<div class="ev-ac">' +
+      '<button class="eab" onclick="window.open(\'' + editUrl + '\',\'_blank\');event.stopPropagation()">✏️ Изменить</button>' +
+      '<button class="eab cp" onclick="copyLnk(\'' + editUrl + '\');event.stopPropagation()">🔗 Скопировать</button>' +
+      '<button class="eab" onclick="dupEv(' + JSON.stringify({summary:e.summary,description:e.description}).replace(/"/g,'&quot;') + ');event.stopPropagation()">📋 Повторить</button>' +
+      '<button class="eab dg" onclick="delConfirm(\'' + e.id + '\',' + e.isBank + ',\'' + (e.bkId||'') + '\');event.stopPropagation()">🗑 Удалить</button>' +
+      '</div></div>' : '';
+    return '<div class="ev' + (isExp ? ' exp' : '') + '" onclick="toggleExp(\'' + e.id + '\')">' +
+      '<div class="ev-t"><div class="ev-d" style="background:#5b7fff"></div>' +
+      '<div class="ev-i"><div class="ev-n">' + warn + (e.summary || 'Без названия') + '</div>' +
+      '<div class="ev-m">' + ds + ' · ' + ts + '</div></div>' +
+      '<div class="ev-tgs">' + bkTag + dwTag + '</div></div>' + acts + '</div>';
+  }).join('');
+}
+
+function toggleExp(id) { expId = expId === id ? null : id; renderEv(); }
+function copyLnk(url) { if (!url) { toast('er', 'Нет ссылки'); return; } navigator.clipboard.writeText(url).then(function() { toast('ok', '✓ Ссылка скопирована'); }); }
+function dupEv(e) {
+  document.getElementById('title').value = (e.summary || '').replace(/^\[.*?\]\s*/, '');
+  document.getElementById('desc').value = e.description || '';
+  setDefTimes();
+  toast('ok', 'Скопировано — измени дату и добавь');
+  document.querySelector('.rp').scrollTo({ top: 0, behavior: 'smooth' });
+}
+function delConfirm(inId, isBank, bkId) {
+  if (!confirm('Удалить событие из календаря?')) return;
+  delEv(CAL_IN, inId).then(function() {
+    if (isBank && bkId) return delEv(CAL_BK, bkId);
+  }).then(function() {
+    toast('ok', '✓ Удалено'); expId = null; loadEvs();
+  }).catch(function() { toast('er', 'Ошибка удаления'); });
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+var toastTmr;
+function toast(type, msg) {
+  var el = document.getElementById('toast');
+  clearTimeout(toastTmr);
+  el.className = 'toast ' + type;
+  el.innerHTML = type === 'ld' ? '<div class="sp"></div>' + msg : msg;
+  el.classList.add('show');
+  if (type !== 'ld') toastTmr = setTimeout(function() { el.classList.remove('show'); }, 3500);
+}
+</script>
+</body>
+</html>
